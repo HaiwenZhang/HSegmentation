@@ -52,16 +52,13 @@ class ResnetDilated(nn.Module):
                     m.padding = (dilate, dilate)
 
     def forward(self, x, return_feature_maps=False):
-        conv_out = []
 
         x = self.relu(self.bn1(self.conv1(x)))
         x = self.maxpool(x)
 
-        x = self.layer1(x); conv_out.append(x);
-        x = self.layer2(x); conv_out.append(x);
-        x = self.layer3(x); conv_out.append(x);
-        x = self.layer4(x); conv_out.append(x);
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
 
-        if return_feature_maps:
-            return conv_out
         return x
