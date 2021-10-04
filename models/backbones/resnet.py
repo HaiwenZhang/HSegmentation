@@ -7,32 +7,31 @@ except ImportError:
 
 resnet50_model_url = "https://download.pytorch.org/models/resnet50-0676ba61.pth"
 
-def conv3x3(in_planes, out_planes, stride=1, padding=1):
-    return nn.Conv2d(in_planes, out_planes, 
-            kernel_size=3, stride=stride, padding=padding, bias=False)
+def conv3x3(in_channels, out_channels, stride=1, dilation=1):
+    return nn.Conv2d(in_channels, out_channels, 
+            kernel_size=3, stride=stride, padding=dilation, dilation=dilation, bias=False)
     
 
-def conv1x1(in_planes, out_planes, stride = 1):
-    return nn.Conv2d(in_planes, out_planes, 
-    kernel_size=1, stride=stride, bias=False)
+def conv1x1(in_channels, out_channels, stride = 1):
+    return nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False)
 
 
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, in_planes, out_planes, stride=1, downsample=None):
+    def __init__(self, in_channels, out_channels, stride=1, dilation=1, downsample=None):
         super(Bottleneck, self).__init__()
 
-        self.in_planes = in_planes
+        self.in_channels = in_channels
 
-        self.conv1 = conv1x1(in_planes, out_planes)
-        self.bn1 = nn.BatchNorm2d(out_planes)
+        self.conv1 = conv1x1(in_channels, out_channels)
+        self.bn1 = nn.BatchNorm2d(out_channels)
 
-        self.conv2 = conv3x3(out_planes, out_planes, stride)
-        self.bn2 = nn.BatchNorm2d(out_planes)
+        self.conv2 = conv3x3(out_channels, out_channels, stride, dilation)
+        self.bn2 = nn.BatchNorm2d(out_channels)
 
-        self.conv3 = conv1x1(out_planes, out_planes * self.expansion)
-        self.bn3 = nn.BatchNorm2d(out_planes * self.expansion)
+        self.conv3 = conv1x1(out_channels, out_channels * self.expansion)
+        self.bn3 = nn.BatchNorm2d(out_channels * self.expansion)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
 
@@ -65,12 +64,13 @@ class ResNet50(nn.Module):
     def __init__(self, num_class=1000):
         super(ResNet50, self).__init__()
 
-        self.in_planes = 64
+        self.in_channels = 64
         self.layers = [3, 4, 6, 3]
+        self.dilation = 1
 
-        self.conv1 = nn.Conv2d(3, self.in_planes, kernel_size=7, stride=2, padding=3, 
+        self.conv1 = nn.Conv2d(3, self.in_channels, kernel_size=7, stride=2, padding=3, 
                                 bias=False)
-        self.bn1 = nn.BatchNorm2d(self.in_planes)
+        self.bn1 = nn.BatchNorm2d(self.in_channels)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
@@ -79,7 +79,6 @@ class ResNet50(nn.Module):
         self.layer3 = self._make_layer(256, self.layers[2], stride=2)
         self.layer4 = self._make_layer(512, self.layers[3], stride=2)
                                        
-
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(2048, num_class)
 
@@ -96,27 +95,26 @@ class ResNet50(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        # x = self.avgpool(x)
-        # x = torch.flatten(x, 1)
-        # x = self.fc(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.fc(x)
 
         return x
 
 
-    def _make_layer(self, planes, blocks, stride=1):
+    def _make_layer(self, channels, blocks, stride=1):
         downsample = nn.Sequential(
-            conv1x1(self.in_planes, planes * Bottleneck.expansion, stride),
-            nn.BatchNorm2d(planes * Bottleneck.expansion),
+            conv1x1(self.in_channels, channels * Bottleneck.expansion, stride),
+            nn.BatchNorm2d(channels * Bottleneck.expansion),
         )
 
         layers = []
-        layers.append(Bottleneck(self.in_planes, planes, stride, downsample))
-        self.in_planes = planes * Bottleneck.expansion
+        layers.append(Bottleneck(self.in_channels, channels, stride, self.dilation, downsample))
+        self.in_channels = channels * Bottleneck.expansion
         for _ in range(1, blocks):
-            layers.append(Bottleneck(self.in_planes, planes))
+            layers.append(Bottleneck(self.in_channels, channels))
 
         return nn.Sequential(*layers)
-
 
 def create_resnet50(pretrained=True):
     model = ResNet50()
@@ -126,12 +124,14 @@ def create_resnet50(pretrained=True):
     return model
 
 
-# if __name__ == "__main__":
 
-#     model = create_resnet50()
+if __name__ == "__main__":
+    model = create_resnet50()
 
-#     img = torch.rand((16, 3, 256, 256))
-#     o = model(img)
-#     print(o.shape)
+    print(model)
+
+    img = torch.rand((16, 3, 256, 256))
+    o = model(img)
+    print(o.shape)
 
 

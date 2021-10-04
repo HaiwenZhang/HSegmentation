@@ -63,42 +63,46 @@ class ASPP(nn.Module):
         rate2 = 12
         rate3 = 18
 
-        self.aspp_pooling = ASPPPooling(in_channels, out_channels)
-        self.aspp1 = ASPP1x1Conv(in_channels, out_channels)
-        self.aspp2 = ASPPConv(in_channels, out_channels, rate1)
-        self.aspp3 = ASPPConv(in_channels, out_channels, rate2)
-        self.aspp4 = ASPPConv(in_channels, out_channels, rate3)
+        self.global_avg_pooling = ASPPPooling(in_channels, out_channels)
+        self.branch1 = ASPP1x1Conv(in_channels, out_channels)
+        self.branch2 = ASPPConv(in_channels, out_channels, rate1)
+        self.branch3 = ASPPConv(in_channels, out_channels, rate2)
+        self.branch4 = ASPPConv(in_channels, out_channels, rate3)
 
-        self.projects = nn.Sequential(
+        self.conv_cat = nn.Sequential(
             nn.Conv2d(5 * out_channels, out_channels, kernel_size=1, bias=False),
             nn.BatchNorm2d(out_channels),
             nn.ReLU()
         )
 
     def forward(self, x):
-        res = []
-        res.append(self.aspp_pooling(x))
-        res.append(self.aspp1(x))
-        res.append(self.aspp2(x))
-        res.append(self.aspp3(x))
-        res.append(self.aspp4(x))
-        results = torch.cat(res, dim=1)
 
-        output = self.projects(results)
+        conv1x1 = self.branch1(x)
+        conv3x3_6 = self.branch2(x)
+        conv3x3_12 = self.branch3(x)
+        conv3x3_18 = self.branch4(x)
+
+        global_feature = self.global_avg_pooling(x)
+
+        results = torch.cat([conv1x1, conv3x3_6, conv3x3_12, conv3x3_18, global_feature], dim=1)
+
+        output = self.conv_cat(results)
         return output
 
 
 class DeeplabV3(nn.Module):
 
-    def __init__(self, num_class):
+    def __init__(self, backbone, num_class, encode_channels=2048):
         super(DeeplabV3, self).__init__()
 
-        self.backbone = create_resnet50()
-        self.aspp = ASPP(2048, num_class)
+        self.backbone = backbone
+        self.aspp = ASPP(encode_channels, num_class)
 
     def forward(self, x):
+        size = x.shape[-2:]
         output = self.backbone(x)
         output = self.aspp(output)
+        output = F.interpolate(output, size=size, mode='bilinear', align_corners=False)
         return output
 
 

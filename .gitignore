@@ -107,3 +107,5 @@ data/
 .vscode/
 .idea/
 __MACOSX/
+
+*.txt
