@@ -56,6 +56,9 @@ def _read_img_rgb(path):
     image = cv2.imread(path, cv2.IMREAD_COLOR).astype(np.float32)
     return image
 
+def _read_label(path):
+    label = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    return label
 
 def _read_voc_info(voc_dir, is_train=True):
     txt_fname = os.path.join(voc_dir, 'ImageSets', 'Segmentation',
@@ -69,7 +72,7 @@ def _read_image_and_label(voc_dir, image_name):
     label_path = os.path.join(voc_dir, 'JPEGImages',  f'{image_name}.jpg')
 
     image = _read_img_rgb(image_path)
-    label = _read_img_rgb(label_path)
+    label = _read_label(label_path)
     return image, label
 
 def _voc_colormap2label():
@@ -98,39 +101,45 @@ def _convert_to_segmentation_mask1(mask):
 
 class VOCSegDataset(Dataset):
 
-    def __init__(self, root, is_train=True, transforms=None):
+    def __init__(self, root, is_train=True, transform=None):
         super(VOCSegDataset, self).__init__()
 
-        self.mode = mode
+        self.is_train=is_train
         self.root = root
-        self.images_info = _read_voc_info(self.root, is_train)
+        self.images_info = _read_voc_info(self.root, self.is_train)
         self.length = len(self.images_info)
-        self.transforms = transforms
+        self.transform = transform
         self.colormap2label = _voc_colormap2label()
 
     def __len__(self):
         return self.length
 
     def __getitem__(self, idx):
-        image_name = self.images_info(idx)
+        image_name = self.images_info[idx]
         image, label = _read_image_and_label(self.root, image_name)
-        mask = _convert_to_segmentation_mask(self.colormap2label, label)
 
         if self.transform is not None:
-            transformed = self.transform(image=image, mask=mask)
+            transformed = self.transform(image=image, mask=label)
             image = transformed["image"]
             mask = transformed["mask"]
+            mask = _convert_to_segmentation_mask1(mask)
         return image, mask
 
 
 
 if __name__ == "__main__":
+    
+    voc_dir = "data/VOC2012"
 
-    label_path = "/Users/haiwen/AI/Datasets/PASCAL_VOC/VOC2012/SegmentationClass/2007_000033.png"
+    label_path = os.path.join(voc_dir,"SegmentationClass", "2007_000033.png")
     label = _read_img_rgb(label_path)
     colormap2label = _voc_colormap2label()
     mask = _convert_to_segmentation_mask(label, colormap2label)
     print(mask.shape)
+
+    images = _read_voc_info(voc_dir, True)
+    print(type(images))
+     
 
 
 

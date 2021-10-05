@@ -109,3 +109,4 @@ data/
 __MACOSX/
 
 *.txt
+output/

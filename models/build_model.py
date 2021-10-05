@@ -3,7 +3,7 @@ import torch.nn as nn
 from .backbones import create_resnet50
 from .heads import DeeplabV3
 
-def build_model(num_class, encode_channels=2048, dilate_scale=8):
+def build_model(num_class, encode_channels=2048, dilate_scale=16):
     pretrained_resnet50 = create_resnet50()
     resnet50_dilate = ResnetDilated(pretrained_resnet50, dilate_scale=dilate_scale)
 

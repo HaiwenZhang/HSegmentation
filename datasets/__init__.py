@@ -1,2 +1,2 @@
 from .pascal import VOCSegDataset
-from .build_data import build_data
+from .build import build_loader

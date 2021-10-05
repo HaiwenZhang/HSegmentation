@@ -1,0 +1,9 @@
+{
+    "log": "output/train.log",
+    "data_dir": "data/VOC2012",
+    "output": "output/",
+    "seed": 240,
+    "epochs": 20,
+    "num_class": 21,
+    "learning_rate": 1e-3
+}
