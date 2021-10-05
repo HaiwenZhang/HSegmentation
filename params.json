@@ -1,6 +1,6 @@
 {
     "log": "output/train.log",
-    "data_dir": "data/VOC2012",
+    "data_dir": "/Users/haiwen/AI/Datasets/PASCAL_VOC/VOC2012",
     "output": "output/",
     "seed": 240,
     "epochs": 20,

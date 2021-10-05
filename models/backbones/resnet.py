@@ -32,7 +32,7 @@ class Bottleneck(nn.Module):
 
         self.conv3 = conv1x1(out_channels, out_channels * self.expansion)
         self.bn3 = nn.BatchNorm2d(out_channels * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
         self.downsample = downsample
 
     def forward(self, x):
@@ -71,7 +71,7 @@ class ResNet50(nn.Module):
         self.conv1 = nn.Conv2d(3, self.in_channels, kernel_size=7, stride=2, padding=3, 
                                 bias=False)
         self.bn1 = nn.BatchNorm2d(self.in_channels)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
         self.layer1 = self._make_layer(64, self.layers[0])

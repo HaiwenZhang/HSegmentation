@@ -43,11 +43,8 @@ def main(params):
 
     optimizer = build_optimizer(params, model)
 
-
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logging.info(f"number of params: {n_parameters}")
-
-    #lr_scheduler = build_scheduler(config, optimizer, len(data_loader_train))
 
     criterion = build_loss()
 
@@ -62,7 +59,6 @@ def main(params):
         acc, loss = validate(params, data_loader_val, model)
 
         max_accuracy = max(max_accuracy, acc)
-        #logger.info(f'Max accuracy: {max_accuracy:.2f}%')
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
@@ -93,22 +89,10 @@ def train_one_epoch(params, model, criterion, data_loader, optimizer, epoch):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            #lr_scheduler.step_update(epoch * num_steps + idx)
 
             loss_meter.update(loss.item(), targets.size(0))
             batch_time.update(time.time() - end)
             end = time.time()
-
-            #if idx % config.PRINT_FREQ == 0:
-            #    lr = optimizer.param_groups[0]['lr']
-            #    memory_used = torch.cuda.max_memory_allocated() / (1024.0 * 1024.0)
-            #    etas = batch_time.avg * (num_steps - idx)
-            #    logger.info(
-            #        f'Train: [{epoch}/{config.TRAIN.EPOCHS}][{idx}/{num_steps}]\t'
-            #        f'eta {datetime.timedelta(seconds=int(etas))} lr {lr:.6f}\t'
-            #        f'time {batch_time.val:.4f} ({batch_time.avg:.4f})\t'
-            #        f'loss {loss_meter.val:.4f} ({loss_meter.avg:.4f})\t'
-            #        f'mem {memory_used:.0f}MB')
 
         t.set_postfix(loss="{:05.3f}".format(loss_meter.avg))        
 
@@ -147,31 +131,10 @@ def validate(params, data_loader, model):
         batch_time.update(time.time() - end)
         end = time.time()
 
-        #if idx % config.PRINT_FREQ == 0:
-        #    memory_used = torch.cuda.max_memory_allocated() / (1024.0 * 1024.0)
-        #    logging.info(
-        #        f'Test: [{idx}/{len(data_loader)}]\t'
-        #        f'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-        #        f'Loss {loss_meter.val:.4f} ({loss_meter.avg:.4f})\t'
-        #        f'Mem {memory_used:.0f}MB')
     return pixel_acc_meter.avg, loss_meter.avg
 
 
 if __name__ == '__main__':
-    #_, config = parse_option()
-    
-    #torch.cuda.set_device()
-
-    # linear scale the learning rate according to total batch size, may not be optimal
-    #linear_scaled_lr = config.TRAIN.BASE_LR * config.DATA.BATCH_SIZE * dist.get_world_size() / 512.0
-    #linear_scaled_warmup_lr = config.TRAIN.WARMUP_LR * config.DATA.BATCH_SIZE * dist.get_world_size() / 512.0
-    #linear_scaled_min_lr = config.TRAIN.MIN_LR * config.DATA.BATCH_SIZE * dist.get_world_size() / 512.0
-
-
-    #os.makedirs(config.OUTPUT, exist_ok=True)
-    #logger = create_logger(output_dir=config.OUTPUT, dist_rank=dist.get_rank(), name=f"{config.MODEL.NAME}")
-
-    # print config
 
     json_path = "params.json"
 

@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 from torch.utils.data import Dataset
+import torchvision.transforms as T
 
 VOC_CLASSES = [
     "background",
@@ -109,6 +110,9 @@ class VOCSegDataset(Dataset):
         self.images_info = _read_voc_info(self.root, self.is_train)
         self.length = len(self.images_info)
         self.transform = transform
+        self.to_tensor = T.Compose([
+            T.ToTensor()
+        ])
         self.colormap2label = _voc_colormap2label()
 
     def __len__(self):
@@ -122,23 +126,26 @@ class VOCSegDataset(Dataset):
             transformed = self.transform(image=image, mask=label)
             image = transformed["image"]
             mask = transformed["mask"]
-            mask = _convert_to_segmentation_mask1(mask)
+        mask = _convert_to_segmentation_mask(mask, self.colormap2label)
+        image = self.to_tensor(image)
+
         return image, mask
 
 
 
 if __name__ == "__main__":
     
-    voc_dir = "data/VOC2012"
+    voc_dir = "/Users/haiwen/AI/Datasets/PASCAL_VOC/VOC2012"
 
     label_path = os.path.join(voc_dir,"SegmentationClass", "2007_000033.png")
-    label = _read_img_rgb(label_path)
-    colormap2label = _voc_colormap2label()
-    mask = _convert_to_segmentation_mask(label, colormap2label)
-    print(mask.shape)
+    # label = _read_img_rgb(label_path)
+    label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
+    print(np.unique(label))
 
-    images = _read_voc_info(voc_dir, True)
-    print(type(images))
+    # colormap2label = _voc_colormap2label()
+    # mask = _convert_to_segmentation_mask(label, colormap2label)
+    # print(mask.shape)
+
      
 
 

@@ -6,8 +6,7 @@ def build_loss():
     return loss
 
 def loss(inputs, targets):
-    #return F.cross_entropy(inputs, targets, reduction='none').mean(1).mean(1)
-    loss = torch.nn.CrossEntropyLoss(inputs, targets)
+    loss = torch.nn.CrossEntropyLoss()(inputs, targets)
     return loss
 
 
