@@ -32,7 +32,7 @@ def parse_option():
     return args
 
 def main(params):
-    data_loader_train, data_loader_val = build_loader(params.data_dir)
+    data_loader_train, data_loader_val = build_loader(params)
 
     model = build_model(params.num_class)
 
@@ -43,9 +43,6 @@ def main(params):
 
     optimizer = build_optimizer(params, model)
 
-    n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    logging.info(f"number of params: {n_parameters}")
-
     criterion = build_loss()
 
     max_accuracy = 0.0
@@ -54,7 +51,7 @@ def main(params):
     start_time = time.time()
     for epoch in range(0, params.epochs):
 
-        train_one_epoch(params, model, criterion, data_loader_train, optimizer, epoch)
+        train_one_epoch(params, model, criterion, data_loader_train, optimizer, epoch, params.epochs)
 
         acc, loss = validate(params, data_loader_val, model)
 
@@ -65,39 +62,44 @@ def main(params):
     logging.info('Training time {}'.format(total_time_str))
 
 
-def train_one_epoch(params, model, criterion, data_loader, optimizer, epoch):
+def train_one_epoch(params, model, criterion, dataloader, optimizer, epoch, num_epochs):
     model.train()
     optimizer.zero_grad()
 
-    num_steps = len(data_loader)
-    batch_time = AverageMeter()
     loss_meter = AverageMeter()
-
     start = time.time()
-    end = time.time()
 
-    with tqdm(total=len(data_loader)) as t:
-        for idx, (samples, targets) in enumerate(data_loader):
 
+    # Use tqdm for progress bar
+    with tqdm(total=len(dataloader)) as t:
+        for i, (samples, targets) in enumerate(dataloader):
+            # move to GPU if available
             if params.cuda:
-                samples = samples.cuda(non_blocking=True)
-                targets = targets.cuda(non_blocking=True)
+                samples, targets = samples.cuda(
+                    non_blocking=True), targets.cuda(non_blocking=True)
 
+            # compute model output and loss
             outputs = model(samples)
-
             loss = criterion(outputs, targets)
+
+            # clear previous gradients, compute gradients of all variables wrt loss
             optimizer.zero_grad()
             loss.backward()
+
+            # performs updates using calculated gradients
             optimizer.step()
 
+            # update the average loss
+
             loss_meter.update(loss.item(), targets.size(0))
-            batch_time.update(time.time() - end)
-            end = time.time()
 
-        t.set_postfix(loss="{:05.3f}".format(loss_meter.avg))        
+            t.set_description(f"Epoch [{epoch}/{num_epochs}]")
+            t.set_postfix(loss="{:05.3f}".format(loss_meter.avg))    
+            t.update()
 
-        epoch_time = time.time() - start
-        logging.info(f"EPOCH {epoch} training takes {datetime.timedelta(seconds=int(epoch_time))}")
+    epoch_time = time.time() - start
+    logging.info(f"EPOCH {epoch} training takes {datetime.timedelta(seconds=int(epoch_time))}")
+
 
 
 @torch.no_grad()

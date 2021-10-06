@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from torch.utils.data import Dataset
 import torchvision.transforms as T
+import torchvision
 
 VOC_CLASSES = [
     "background",
@@ -57,23 +58,12 @@ def _read_img_rgb(path):
     image = cv2.imread(path, cv2.IMREAD_COLOR).astype(np.float32)
     return image
 
-def _read_label(path):
-    label = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-    return label
-
-def _read_voc_info(voc_dir, is_train=True):
-    txt_fname = os.path.join(voc_dir, 'ImageSets', 'Segmentation',
-                             'train.txt' if is_train else 'val.txt')
-    with open(txt_fname, 'r') as f:
-        images = f.read().split()
-    return images
-
 def _read_image_and_label(voc_dir, image_name):
     image_path = os.path.join(voc_dir, 'JPEGImages',  f'{image_name}.jpg')
     label_path = os.path.join(voc_dir, 'JPEGImages',  f'{image_name}.jpg')
 
     image = _read_img_rgb(image_path)
-    label = _read_label(label_path)
+    label = _read_img_rgb(label_path)
     return image, label
 
 def _voc_colormap2label():
@@ -91,36 +81,47 @@ def _convert_to_segmentation_mask(colormap, colormap2label):
            + colormap[:, :, 2])
     return colormap2label[idx]
 
-def _convert_to_segmentation_mask1(mask):
-    """将VOC标签中的RGB值映射到它们的类别索引。"""
-    height, width = mask.shape[:2]
-    segmentation_mask = np.zeros((height, width, len(VOC_COLORMAP)), dtype=np.float32)
-    for label_index, label in enumerate(VOC_COLORMAP):
-        segmentation_mask[:, :, label_index] = np.all(mask == label, axis=-1).astype(float)
-    return segmentation_mask
+
+def read_voc_images(voc_dir, is_train=True):
+    """读取所有VOC图像并标注。"""
+    txt_fname = os.path.join(voc_dir, 'ImageSets', 'Segmentation',
+                             'train.txt' if is_train else 'val.txt')
+    mode = torchvision.io.image.ImageReadMode.RGB
+    with open(txt_fname, 'r') as f:
+        images = f.read().split()
+    features, labels = [], []
+    for i, fname in enumerate(images):
+       feature, label = _read_image_and_label(voc_dir=voc_dir, image_name=fname)
+       features.append(feature)
+       labels.append(label)
+    return features, labels
 
 
 class VOCSegDataset(Dataset):
+    """一个用于加载VOC数据集的自定义数据集。"""
 
-    def __init__(self, root, is_train=True, transform=None):
-        super(VOCSegDataset, self).__init__()
+    def __init__(self, voc_dir, image_size, is_train=True, transform=None):
 
-        self.is_train=is_train
-        self.root = root
-        self.images_info = _read_voc_info(self.root, self.is_train)
-        self.length = len(self.images_info)
+        self.crop_size = image_size
+        features, labels = read_voc_images(voc_dir, is_train=is_train)
+        self.features = self.filter(features)
+        self.labels = self.filter(labels)
+        self.colormap2label = _voc_colormap2label()
         self.transform = transform
         self.to_tensor = T.Compose([
             T.ToTensor()
         ])
-        self.colormap2label = _voc_colormap2label()
+        print('keep ' + str(len(self.features)) + ' examples')
 
-    def __len__(self):
-        return self.length
+    def filter(self, imgs):
+        return [img for img in imgs if (
+            img.shape[0] >= self.crop_size[0] and
+            img.shape[1] >= self.crop_size[1])]
 
     def __getitem__(self, idx):
-        image_name = self.images_info[idx]
-        image, label = _read_image_and_label(self.root, image_name)
+        image = self.features[idx]
+        label = self.labels[idx]
+
 
         if self.transform is not None:
             transformed = self.transform(image=image, mask=label)
@@ -130,6 +131,10 @@ class VOCSegDataset(Dataset):
         image = self.to_tensor(image)
 
         return image, mask
+
+    def __len__(self):
+        return len(self.features)
+
 
 
 
