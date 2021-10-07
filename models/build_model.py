@@ -3,16 +3,17 @@ import torch.nn as nn
 from .backbones import create_resnet50
 from .heads import DeeplabV3
 
-def build_model(num_class, encode_channels=2048, dilate_scale=16):
-    pretrained_resnet50 = create_resnet50()
-    resnet50_dilate = ResnetDilated(pretrained_resnet50, dilate_scale=dilate_scale)
+def build_model(config):
 
-    deeplab_v3 = DeeplabV3(resnet50_dilate, num_class, encode_channels)
+    pretrained_resnet50 = create_resnet50()
+    resnet50_dilate = ResnetDilated(pretrained_resnet50, dilate_scale=config.DATASET.segm_downsampling_rate)
+
+    deeplab_v3 = DeeplabV3(resnet50_dilate, config.DATASET.num_class, config.MODEL.fc_dim)
 
     return deeplab_v3
 
 class ResnetDilated(nn.Module):
-    def __init__(self, orig_resnet, dilate_scale=8):
+    def __init__(self, orig_resnet, dilate_scale=16):
         super(ResnetDilated, self).__init__()
         from functools import partial
 

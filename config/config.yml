@@ -1,0 +1,31 @@
+OUTPUT: "./output"
+DATASET:
+  root_dataset: "./data/"
+  num_class: 21
+  image_size: (256, 256)
+  segm_downsampling_rate: 16
+  batch_size: 16
+
+MODEL:
+  fc_dim: 2048
+
+TRAIN:
+  num_epochs: 30
+  start_epoch: 0
+  epoch_iters: 5000
+  optim: "SGD"
+  lr_encoder: 0.02
+  lr_decoder: 0.02
+  lr_pow: 0.9
+  beta1: 0.9
+  weight_decay: 1e-4
+  early_stop: 10
+  resume: False
+  mnt_mode: max
+  workers: 16
+  seed: 304
+
+LOG:
+  dir_name: "log"
+  train_file: "train.log"
+  tensorboard_file: "tensorborad"
