@@ -1,8 +1,8 @@
 import os
-import tqdm
 import time
 import datetime
 import torch
+from tqdm import tqdm
 
 from .tracker import MetricTracker
 
@@ -26,21 +26,17 @@ class Trainer(object):
 
         self.device = device
         self.train_data_loader = train_data_loader
-
-        self.len_epoch = len(self.train_data_loader)
  
         self.valid_data_loader = valid_data_loader
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
 
-        self.train_metrics = MetricTracker("loss", "acc", writer=self.writer)
-        self.valid_metrics = MetricTracker("loss", "acc", writer=self.writer)
+        self.train_metrics = MetricTracker("loss", "acc")
+        self.valid_metrics = MetricTracker("loss", "acc")
 
         self.early_stop = config.TRAIN.early_stop
-        self.mnt_best = 0.0
-        self.mnt_mode = config.TRAIN.mnt_mode
 
-        if config.TRAIN.resume is not None:
+        if config.TRAIN.resume:
             self._resume_checkpoint(config)
 
     def train(self):
@@ -54,27 +50,7 @@ class Trainer(object):
             # get valid acc
             valid_acc = self.valid_metrics.avg('acc')
 
-            # evaluate model performance according to configured metric, save best checkpoint as model_best
-            best = False
-            if self.mnt_mode != 'off':
-                
-                # check whether model performance improved or not, according to specified metric(mnt_metric)
-                improved = (self.mnt_mode == 'min' and self.mnt_best <= valid_acc) or \
-                     (self.mnt_mode == 'max' and self.mnt_best >= valid_acc)
-
-                if improved:
-                    self.mnt_best = valid_acc
-                    not_improved_count = 0
-                    best = True
-                else:
-                    not_improved_count += 1
-
-                if not_improved_count > self.early_stop:
-                    self.logger.info("Validation performance didn\'t improve for {} epochs. "
-                                     "Training stops.".format(self.early_stop))
-                    break
-
-            self._save_checkpoint(epoch, valid_acc, save_best=best)
+            self._save_checkpoint(epoch, valid_acc)
 
     def _train_epoch(self, epoch):
         """
@@ -88,8 +64,8 @@ class Trainer(object):
         self.train_metrics.reset()
 
          # Use tqdm for progress bar
-        with tqdm(total=self.len_epoch) as t:
-            for batch_idx, (data, target) in enumerate(self.data_loader):
+        with tqdm(total=len(self.train_data_loader)) as t:
+            for _, (data, target) in enumerate(self.train_data_loader):
                 data, target = data.to(self.device), target.to(self.device)
 
                 self.optimizer.zero_grad()
@@ -98,12 +74,14 @@ class Trainer(object):
                 loss.backward()
                 self.optimizer.step()
 
+                acc = self.metric(output, target)
+
                 self.train_metrics.update("loss", loss.item())
-                self.train_metrics.update("acc", self.metric(output, target))
+                self.train_metrics.update("acc", acc.item())
 
                 t.set_description(f"Epoch [{epoch}/{self.total_epochs}]")
-                t.set_postfix(loss="{:05.3f}".format(self.train_metrics.avg('loss')), 
-                            acc="{:05.3f}".format(self.train_metrics.avg('acc')))    
+                t.set_postfix(train_loss="{:05.3f}".format(loss.item()), 
+                            train_acc="{:05.3f}".format(acc.item()))    
                 t.update()
 
         if self.do_validation:
@@ -118,7 +96,7 @@ class Trainer(object):
                 f"Train: [{epoch}/{self.total_epochs}]\t"
                 f"one epoch training takes time {datetime.timedelta(seconds=int(epoch_time))}\t"
                 f"train loss: {self.train_metrics.avg('loss'):.4f} val loss: {self.valid_metrics.avg('loss'):.4f}\t"
-                f"train acc: {self.train_metrics.avg('acc'):.4f} val loss: {self.valid_metrics.avg('acc'):.4f}\t"
+                f"train acc: {self.train_metrics.avg('acc'):.4f} val acc: {self.valid_metrics.avg('acc'):.4f}\t"
                 f"mem {memory_used:.0f}MB")
 
     def _valid_epoch(self, epoch):
@@ -139,7 +117,7 @@ class Trainer(object):
                 self.valid_metrics.update("loss", loss.item())
                 self.valid_metrics.update("acc", self.metric(output, target))
 
-    def _save_checkpoint(self, epoch, max_accuracy, save_best=False):
+    def _save_checkpoint(self, epoch, max_accuracy):
         """
         Saving checkpoints
 
@@ -150,7 +128,6 @@ class Trainer(object):
         state = {
             'model': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
-            'lr_scheduler': self.lr_scheduler.state_dict(),
             'max_accuracy': max_accuracy,
             'epoch': epoch,
             'config': self.config
@@ -159,10 +136,10 @@ class Trainer(object):
         save_path = os.path.join(self.config.OUTPUT, f'ckpt_epoch_{epoch}.pth')
         torch.save(state, save_path)
         self.logger.info("Saving checkpoint: {} ...".format(save_path))
-        if save_best:
-            best_path = os.path.join(self.config.OUTPUT, f'model_best.pth')
-            torch.save(state, best_path)
-            self.logger.info("Saving current best: model_best.pth ...")
+        # if save_best:
+        #     best_path = os.path.join(self.config.OUTPUT, f'model_best.pth')
+        #     torch.save(state, best_path)
+        #     self.logger.info("Saving current best: model_best.pth ...")
 
     def _resume_checkpoint(self):
         """

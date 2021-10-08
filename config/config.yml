@@ -1,6 +1,6 @@
 OUTPUT: "./output"
 DATASET:
-  root_dataset: "./data/"
+  root_dataset: "/home/haiwen/Datasets/VOC2012"
   num_class: 21
   image_size: (256, 256)
   segm_downsampling_rate: 16
@@ -12,7 +12,6 @@ MODEL:
 TRAIN:
   num_epochs: 30
   start_epoch: 0
-  epoch_iters: 5000
   optim: "SGD"
   lr_encoder: 0.02
   lr_decoder: 0.02
@@ -22,7 +21,7 @@ TRAIN:
   early_stop: 10
   resume: False
   mnt_mode: max
-  workers: 16
+  workers: 4
   seed: 304
 
 LOG:

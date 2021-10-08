@@ -11,7 +11,7 @@ def build_loader(config):
     val_transform = build_transform(config, is_train=False)
 
     dataset_train, dataset_val = build_dataset(
-        config.voc_dir, 
+        config.DATASET.root_dataset, 
         config.DATASET.image_size, 
         train_transfomr=train_transform, 
         val_transform=val_transform
@@ -19,15 +19,15 @@ def build_loader(config):
 
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train,
-        batch_size=config.batch_size,
-        num_workers=config.num_workers,
+        batch_size=config.DATASET.batch_size,
+        num_workers=config.TRAIN.workers,
         shuffle=True
     )
 
     data_loader_val = torch.utils.data.DataLoader(
         dataset_val,
-        batch_size=config.batch_size,
-        num_workers=config.num_workers,
+        batch_size=config.DATASET.batch_size,
+        num_workers=config.TRAIN.workers,
         shuffle=False
     )
 
@@ -59,6 +59,7 @@ def build_transform(config, is_train=True):
         transform = A.Compose([
             A.RandomCrop(width=width, height=height),
             A.HorizontalFlip(),
+            A.RandomBrightnessContrast(p=0.2),
             A.Normalize(
                 mean=IMAGENET_DEFAULT_MEAN,
                 std=IMAGENET_DEFAULT_STD,
@@ -67,6 +68,7 @@ def build_transform(config, is_train=True):
     else:
         transform = A.Compose([
             A.RandomCrop(width=width, height=height),
+            A.RandomBrightnessContrast(p=0.2),
             A.Normalize(
                 mean=IMAGENET_DEFAULT_MEAN,
                 std=IMAGENET_DEFAULT_STD,

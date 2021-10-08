@@ -1,6 +1,7 @@
 import os
 import cv2
 import numpy as np
+import torch
 from torch.utils.data import Dataset
 import torchvision.transforms as T
 import torchvision
@@ -96,6 +97,11 @@ def read_voc_images(voc_dir, is_train=True):
        labels.append(label)
     return features, labels
 
+def label2image(pred, device):
+    colormap = torch.tensor(VOC_COLORMAP, device=device)
+    X = pred.long()
+    return colormap[X, :]
+
 
 class VOCSegDataset(Dataset):
     """一个用于加载VOC数据集的自定义数据集。"""
@@ -111,7 +117,6 @@ class VOCSegDataset(Dataset):
         self.to_tensor = T.Compose([
             T.ToTensor()
         ])
-        print('keep ' + str(len(self.features)) + ' examples')
 
     def filter(self, imgs):
         return [img for img in imgs if (

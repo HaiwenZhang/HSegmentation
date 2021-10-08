@@ -20,7 +20,7 @@ from trainer import Trainer
 
 def parse_option():
     parser = argparse.ArgumentParser('DeeplabV3 training script', add_help=False)
-
+    parser.add_argument('--cfg', type=str, help='config file path')
     parser.add_argument('--gpu', type=str, help='GPU to use')
     parser.add_argument('--is_save_cfg', type=bool, default=True, help='If save train config file')
 
@@ -29,12 +29,14 @@ def parse_option():
     return args
 
 def main(config):
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
     train_data_loader, valid_data_loader = build_loader(config)
 
     model = build_model(config)
 
-    if config.cuda:
-        model.cuda()
+    model.to(device)
 
     optimizer = build_optimizer(config, model)
     criterion = build_loss()
@@ -43,7 +45,7 @@ def main(config):
 
     trainer = Trainer(logger, model, criterion, 
                         acc, optimizer, config, 
-                        config.device, train_data_loader, valid_data_loader)
+                        device, train_data_loader, valid_data_loader)
 
     logger.info("Start training")
     start_time = time.time()
@@ -59,7 +61,6 @@ if __name__ == '__main__':
     args = parse_option()
 
     cfg.merge_from_file(args.cfg)
-    cfg.merge_from_file(args.opts)
 
     if not os.path.isdir(cfg.OUTPUT):
         os.makedirs(cfg.OUTPUT)
@@ -69,13 +70,11 @@ if __name__ == '__main__':
 
     logger = create_logger(log_dir)
 
-    if cfg.is_save_cfg:
+    if args.is_save_cfg:
         path = os.path.join(cfg.OUTPUT, "config.yml")
-        with open(path) as f:
+        with open(path, 'w') as f:
             f.write("{}".format(cfg))
         logger.info(f"Full config saved to {path}")
     
     setup_seed(cfg.TRAIN.seed)
-
-    logger.info(cfg.dump())
     main(cfg)

@@ -10,7 +10,7 @@ _C.DATASET.num_class = 21
 _C.DATASET.image_size = (256, 256)
 # downsampling rate of the segmentation label
 _C.DATASET.segm_downsampling_rate = 16
-_C.DATASET.bach_size = 16
+_C.DATASET.batch_size = 16
 
 # -----------------------------------------------------------------------------
 # Model
@@ -25,7 +25,7 @@ _C.MODEL.fc_dim = 2048
 # -----------------------------------------------------------------------------
 _C.TRAIN = CN()
 # epochs to train for
-_C.TRAIN.num_epoch = 20
+_C.TRAIN.num_epochs = 20
 # epoch to start training. useful if continue from a checkpoint
 _C.TRAIN.start_epoch = 0
 

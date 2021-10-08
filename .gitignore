@@ -110,3 +110,4 @@ __MACOSX/
 
 *.txt
 output/
+config/local.yml
