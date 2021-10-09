@@ -12,7 +12,8 @@ import torch
 from config import cfg
 from models import build_model
 from datasets import build_loader
-from loss import build_loss, pixel_acc
+from loss import build_loss
+from metrics import pixel_acc
 from optimizer import build_optimizer
 from logger import create_logger
 from utils import setup_seed

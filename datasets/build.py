@@ -21,14 +21,16 @@ def build_loader(config):
         dataset_train,
         batch_size=config.DATASET.batch_size,
         num_workers=config.TRAIN.workers,
-        shuffle=True
+        shuffle=True,
+        pin_memory=True
     )
 
     data_loader_val = torch.utils.data.DataLoader(
         dataset_val,
         batch_size=config.DATASET.batch_size,
         num_workers=config.TRAIN.workers,
-        shuffle=False
+        shuffle=False,
+        pin_memory=True
     )
 
     return data_loader_train, data_loader_val
@@ -52,14 +54,21 @@ def build_dataset(voc_dir, image_size, train_transfomr=None, val_transform=None)
 
 def build_transform(config, is_train=True):
 
-    width = config.DATASET.image_size[0]
-    height = config.DATASET.image_size[1]
+    resize_height = config.DATASET.image_size[1]
+    resize_width = config.DATASET.image_size[0]
+
+    crop_height = config.DATASET.crop_size[0]
+    crop_width = config.DATASET.crop_size[1]
 
     if is_train:
         transform = A.Compose([
-            A.RandomCrop(width=width, height=height),
-            A.HorizontalFlip(),
-            A.RandomBrightnessContrast(p=0.2),
+            A.Resize(height=resize_height, width=resize_width),
+            A.CenterCrop(height=crop_height, width=crop_width),
+            A.OneOf([
+                A.HorizontalFlip(),
+                A.RGBShift(p=1),
+                A.Blur(blur_limit=11, p=1)
+            ]),
             A.Normalize(
                 mean=IMAGENET_DEFAULT_MEAN,
                 std=IMAGENET_DEFAULT_STD,
@@ -67,8 +76,8 @@ def build_transform(config, is_train=True):
         ])
     else:
         transform = A.Compose([
-            A.RandomCrop(width=width, height=height),
-            A.RandomBrightnessContrast(p=0.2),
+            A.Resize(height=resize_height, width=resize_width),
+            A.CenterCrop(height=crop_height, width=crop_width),
             A.Normalize(
                 mean=IMAGENET_DEFAULT_MEAN,
                 std=IMAGENET_DEFAULT_STD,

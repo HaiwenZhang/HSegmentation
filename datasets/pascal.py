@@ -6,6 +6,9 @@ from torch.utils.data import Dataset
 import torchvision.transforms as T
 import torchvision
 
+cv2.setNumThreads(0)
+cv2.ocl.setUseOpenCL(False)
+
 VOC_CLASSES = [
     "background",
     "aeroplane",
@@ -109,24 +112,17 @@ class VOCSegDataset(Dataset):
     def __init__(self, voc_dir, image_size, is_train=True, transform=None):
 
         self.crop_size = image_size
-        features, labels = read_voc_images(voc_dir, is_train=is_train)
-        self.features = self.filter(features)
-        self.labels = self.filter(labels)
+        self.features, self.labels = read_voc_images(voc_dir, is_train=is_train)
         self.colormap2label = _voc_colormap2label()
         self.transform = transform
         self.to_tensor = T.Compose([
             T.ToTensor()
         ])
 
-    def filter(self, imgs):
-        return [img for img in imgs if (
-            img.shape[0] >= self.crop_size[0] and
-            img.shape[1] >= self.crop_size[1])]
-
     def __getitem__(self, idx):
+
         image = self.features[idx]
         label = self.labels[idx]
-
 
         if self.transform is not None:
             transformed = self.transform(image=image, mask=label)
@@ -139,22 +135,6 @@ class VOCSegDataset(Dataset):
 
     def __len__(self):
         return len(self.features)
-
-
-
-
-if __name__ == "__main__":
-    
-    voc_dir = "/Users/haiwen/AI/Datasets/PASCAL_VOC/VOC2012"
-
-    label_path = os.path.join(voc_dir,"SegmentationClass", "2007_000033.png")
-    # label = _read_img_rgb(label_path)
-    label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
-    print(np.unique(label))
-
-    # colormap2label = _voc_colormap2label()
-    # mask = _convert_to_segmentation_mask(label, colormap2label)
-    # print(mask.shape)
 
      
 

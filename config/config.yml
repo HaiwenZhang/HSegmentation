@@ -3,8 +3,9 @@ DATASET:
   root_dataset: "/home/haiwen/Datasets/VOC2012"
   num_class: 21
   image_size: (256, 256)
+  crop_size: (224, 224)
   segm_downsampling_rate: 16
-  batch_size: 16
+  batch_size: 32
 
 MODEL:
   fc_dim: 2048

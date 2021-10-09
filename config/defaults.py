@@ -8,6 +8,7 @@ _C.DATASET.root_dataset = "./data/"
 _C.DATASET.num_class = 21
 # multiscale train/test, size of short edge (int or tuple)
 _C.DATASET.image_size = (256, 256)
+_C.DATASET.crop_size = (224, 224)
 # downsampling rate of the segmentation label
 _C.DATASET.segm_downsampling_rate = 16
 _C.DATASET.batch_size = 16

@@ -1,8 +1,15 @@
 import os
 import time
 import datetime
+from apex.amp.handle import scale_loss
 import torch
 from tqdm import tqdm
+
+try:
+    # noinspection PyUnresolvedReferences
+    from apex import amp
+except ImportError:
+    amp = None
 
 from .tracker import MetricTracker
 
@@ -16,9 +23,11 @@ class Trainer(object):
         self.logger = logger
 
         self.model = model
+        self.optimizer = optimizer
         self.criterion = criterion
         self.metric = metric
-        self.optimizer = optimizer
+
+        self.model, self.optimizer = amp.initialize(model, optimizer, opt_level="O1")
         
         self.num_epochs = config.TRAIN.num_epochs
         self.start_epoch = config.TRAIN.start_epoch
@@ -43,7 +52,6 @@ class Trainer(object):
         """
         Full training logic
         """
-        not_improved_count = 0
         for epoch in range(self.start_epoch, self.num_epochs + 1):
             self._train_epoch(epoch)
 
@@ -71,7 +79,9 @@ class Trainer(object):
                 self.optimizer.zero_grad()
                 output = self.model(data)
                 loss = self.criterion(output, target)
-                loss.backward()
+
+                with amp.scale_loss(loss, self.optimizer) as scaled_loss:
+                    scaled_loss.backward()
                 self.optimizer.step()
 
                 acc = self.metric(output, target)
@@ -91,13 +101,12 @@ class Trainer(object):
             self.lr_scheduler.step()
 
         epoch_time = time.time() - start
-        memory_used = torch.cuda.max_memory_allocated() / (1024.0 * 1024.0)
+
         self.logger.info(
                 f"Train: [{epoch}/{self.total_epochs}]\t"
                 f"one epoch training takes time {datetime.timedelta(seconds=int(epoch_time))}\t"
                 f"train loss: {self.train_metrics.avg('loss'):.4f} val loss: {self.valid_metrics.avg('loss'):.4f}\t"
-                f"train acc: {self.train_metrics.avg('acc'):.4f} val acc: {self.valid_metrics.avg('acc'):.4f}\t"
-                f"mem {memory_used:.0f}MB")
+                f"train acc: {self.train_metrics.avg('acc'):.4f} val acc: {self.valid_metrics.avg('acc'):.4f}\t")
 
     def _valid_epoch(self, epoch):
         """
@@ -147,4 +156,9 @@ class Trainer(object):
 
         """
         
+
+    def _save_samplers(epoch, data, pred, sample_num=2):
+
+        images = 0
+
 

@@ -1,6 +1,7 @@
 import torch
 
 from models import build_model
+from datasets import build_loader
 
 
 if __name__ == "__main__":
