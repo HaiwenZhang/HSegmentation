@@ -111,3 +111,4 @@ __MACOSX/
 *.txt
 output/
 config/local.yml
+.DS_Store
