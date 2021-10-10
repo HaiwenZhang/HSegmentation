@@ -2,7 +2,8 @@ from torch.utils.data import dataset
 from tqdm import tqdm
 import os
 import argparse
-import numpy as np
+
+from models import build_predict_model
 
 from torch.utils import data
 
@@ -21,8 +22,22 @@ def get_argparser():
     # Datset Options
     parser.add_argument("--input", type=str, required=True,
                         help="path to a single image or image directory")
-    parser.add_argument("--dataset", type=str, default='voc',
-                        choices=['voc', 'cityscapes'], help='Name of training set')
+    parser.add_argument("--ckpt", type=str, help='model checkpoint')
+    parser.add_argument("--output", type=str, help="Predict image directory")
+
+    return parser
+
+
+
+def read_voc_val_data_info(voc_dir):
+    txt_fname = os.path.join(voc_dir, 'ImageSets', 'Segmentation', 'val.txt')
+    with open(txt_fname, 'r') as f:
+        img_lists = f.read().split()
+    return img_lists
+
+def read_image(path):
+    img = Image.open(path).convert('RGB')
+    return img
 
 
 def main():
@@ -31,50 +46,35 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("Device: %s" % device)
 
-    # Setup dataloader
-    image_files = []
-    if os.path.isdir(opts.input):
-        for ext in ['png', 'jpeg', 'jpg', 'JPEG']:
-            files = glob(os.path.join(opts.input, '**/*.png'), recursive=True)
-            if len(files)>0:
-                image_files.extend(files)
-    elif os.path.isfile(opts.input):
-        image_files.append(opts.input)
+    # Setup data
+    images = read_voc_val_data_info(opts.input)
     
     # Set up model
 
-    model = 
-
-    checkpoint = torch.load(opts.ckpt, map_location=torch.device('cpu'))
-    model.load_state_dict(checkpoint["model_state"])
-    model = nn.DataParallel(model)
+    model = build_predict_model(opts.ckpt)
     model.to(device)
-    print("Resume model from %s" % opts.ckpt)
-    del checkpoint
 
     transform = T.Compose([
-            T.Resize(opts.crop_size),
-            T.CenterCrop(opts.crop_size),
+            T.Resize(256),
+            T.CenterCrop(224),
             T.ToTensor(),
             T.Normalize(mean=[0.485, 0.456, 0.406],
                         std=[0.229, 0.224, 0.225]),
-            ])
 
-    if opts.save_val_results_to is not None:
-        os.makedirs(opts.save_val_results_to, exist_ok=True)
+        ])
+
+    if opts.output is not None:
+        os.makedirs(opts.output, exist_ok=True)
     with torch.no_grad():
         model = model.eval()
-        for img_path in tqdm(image_files):
-            img_name = os.path.basename(img_path).split('.')[0]
-            img = Image.open(img_path).convert('RGB')
-            img = transform(img).unsqueeze(0) # To tensor of NCHW
-            img = img.to(device)
-            
-            pred = model(img).max(1)[1].cpu().numpy()[0] # HW
-            colorized_preds = decode_fn(pred).astype('uint8')
-            colorized_preds = Image.fromarray(colorized_preds)
-            if opts.save_val_results_to:
-                colorized_preds.save(os.path.join(opts.save_val_results_to, img_name+'.png'))
+        for fname in tqdm(images):
+            path = os.path.join(opts.input, 'JPEGImages',  f'{fname}.jpg')
+            image = read_image(path)
+            image = transform(image).unsqueeze(0).to(device)
+    
+            pred = model(image).max(1)[1].cpu().numpy()[0] # HW
+
+            print(pred.shape)
 
 if __name__ == '__main__':
     main()

@@ -29,3 +29,7 @@ LOG:
   dir_name: "log"
   train_file: "train.log"
   tensorboard_file: "tensorborad"
+
+
+VALID:
+  dir: "valid"

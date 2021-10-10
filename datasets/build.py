@@ -1,4 +1,5 @@
 import torch
+import cv2
 import albumentations as A
 from .pascal import VOCSegDataset
 
@@ -12,7 +13,6 @@ def build_loader(config):
 
     dataset_train, dataset_val = build_dataset(
         config.DATASET.root_dataset, 
-        config.DATASET.image_size, 
         train_transfomr=train_transform, 
         val_transform=val_transform
     )
@@ -35,17 +35,15 @@ def build_loader(config):
 
     return data_loader_train, data_loader_val
 
-def build_dataset(voc_dir, image_size, train_transfomr=None, val_transform=None):
+def build_dataset(voc_dir, train_transfomr=None, val_transform=None):
     
     dataset_train = VOCSegDataset(
         voc_dir, 
-        image_size, 
         is_train=True, 
         transform=train_transfomr
     )
     dataset_val = VOCSegDataset(
         voc_dir, 
-        image_size, 
         is_train=False, 
         transform=val_transform
     )
@@ -64,11 +62,7 @@ def build_transform(config, is_train=True):
         transform = A.Compose([
             A.Resize(height=resize_height, width=resize_width),
             A.CenterCrop(height=crop_height, width=crop_width),
-            A.OneOf([
-                A.HorizontalFlip(),
-                A.RGBShift(p=1),
-                A.Blur(blur_limit=11, p=1)
-            ]),
+            A.HorizontalFlip(p=0.5),
             A.Normalize(
                 mean=IMAGENET_DEFAULT_MEAN,
                 std=IMAGENET_DEFAULT_STD,

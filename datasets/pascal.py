@@ -58,20 +58,27 @@ VOC_COLORMAP = [
     [0, 64, 128],
 ]
 
+
+def label2image(pred, device):
+    colormap = torch.tensor(VOC_COLORMAP, device=device)
+    X = pred.long()
+    return colormap[X, :]
+
 def _read_img_rgb(path):
-    image = cv2.imread(path, cv2.IMREAD_COLOR).astype(np.float32)
+    image = cv2.imread(path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
     return image
 
 def _read_image_and_label(voc_dir, image_name):
     image_path = os.path.join(voc_dir, 'JPEGImages',  f'{image_name}.jpg')
-    label_path = os.path.join(voc_dir, 'JPEGImages',  f'{image_name}.jpg')
+    label_path = os.path.join(voc_dir, 'SegmentationClass',  f'{image_name}.png')
 
     image = _read_img_rgb(image_path)
     label = _read_img_rgb(label_path)
     return image, label
 
 def _voc_colormap2label():
-    """构建从RGB到VOC类别索引的映射。"""
+
     colormap2label = np.zeros(256 ** 3, dtype=np.long)
     for i, colormap in enumerate(VOC_COLORMAP):
         colormap2label[
@@ -79,7 +86,7 @@ def _voc_colormap2label():
     return colormap2label
 
 def _convert_to_segmentation_mask(colormap, colormap2label):
-    """将VOC标签中的RGB值映射到它们的类别索引。"""
+
     colormap = colormap.astype(np.int32)
     idx = ((colormap[:, :, 0] * 256 + colormap[:, :, 1]) * 256
            + colormap[:, :, 2])
@@ -87,14 +94,13 @@ def _convert_to_segmentation_mask(colormap, colormap2label):
 
 
 def read_voc_images(voc_dir, is_train=True):
-    """读取所有VOC图像并标注。"""
+
     txt_fname = os.path.join(voc_dir, 'ImageSets', 'Segmentation',
                              'train.txt' if is_train else 'val.txt')
-    mode = torchvision.io.image.ImageReadMode.RGB
     with open(txt_fname, 'r') as f:
         images = f.read().split()
     features, labels = [], []
-    for i, fname in enumerate(images):
+    for _, fname in enumerate(images):
        feature, label = _read_image_and_label(voc_dir=voc_dir, image_name=fname)
        features.append(feature)
        labels.append(label)
@@ -107,11 +113,9 @@ def label2image(pred, device):
 
 
 class VOCSegDataset(Dataset):
-    """一个用于加载VOC数据集的自定义数据集。"""
 
-    def __init__(self, voc_dir, image_size, is_train=True, transform=None):
+    def __init__(self, voc_dir, is_train=True, transform=None):
 
-        self.crop_size = image_size
         self.features, self.labels = read_voc_images(voc_dir, is_train=is_train)
         self.colormap2label = _voc_colormap2label()
         self.transform = transform

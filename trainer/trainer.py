@@ -1,4 +1,5 @@
 import os
+import cv2
 import time
 import datetime
 from apex.amp.handle import scale_loss
@@ -12,6 +13,11 @@ except ImportError:
     amp = None
 
 from .tracker import MetricTracker
+from datasets import label2image
+
+
+TRIAN_BAR_COLOR = "#00BFFF"
+VALID_BAR_COLOR = "#00FF00"
 
 class Trainer(object):
     """
@@ -71,8 +77,8 @@ class Trainer(object):
         self.model.train()
         self.train_metrics.reset()
 
-         # Use tqdm for progress bar
-        with tqdm(total=len(self.train_data_loader)) as t:
+        # Use tqdm for progress bar
+        with tqdm(total=len(self.train_data_loader), colour=TRIAN_BAR_COLOR) as t:
             for _, (data, target) in enumerate(self.train_data_loader):
                 data, target = data.to(self.device), target.to(self.device)
 
@@ -89,7 +95,7 @@ class Trainer(object):
                 self.train_metrics.update("loss", loss.item())
                 self.train_metrics.update("acc", acc.item())
 
-                t.set_description(f"Epoch [{epoch}/{self.total_epochs}]")
+                t.set_description(f"Epoch Train [{epoch}/{self.total_epochs}]")
                 t.set_postfix(train_loss="{:05.3f}".format(loss.item()), 
                             train_acc="{:05.3f}".format(acc.item()))    
                 t.update()
@@ -117,14 +123,25 @@ class Trainer(object):
         self.model.eval()
         self.valid_metrics.reset()
         with torch.no_grad():
-            for batch_idx, (data, target) in enumerate(self.valid_data_loader):
-                data, target = data.to(self.device), target.to(self.device)
+             # Use tqdm for progress bar
+            with tqdm(total=len(self.valid_data_loader), colour=VALID_BAR_COLOR) as t:
+                for batch_idx, (data, target) in enumerate(self.train_data_loader):
+                    data, target = data.to(self.device), target.to(self.device)
 
-                output = self.model(data)
-                loss = self.criterion(output, target)
+                    output = self.model(data)
+                    loss = self.criterion(output, target)
+                    acc = self.metric(output, target)
                 
-                self.valid_metrics.update("loss", loss.item())
-                self.valid_metrics.update("acc", self.metric(output, target))
+                    self.valid_metrics.update("loss", loss.item())
+                    self.valid_metrics.update("acc", acc.item())
+
+                    self._save_samplers(epoch, batch_idx, data, target, output)
+
+                    t.set_description(f"Epoch Valid [{epoch}/{self.total_epochs}]")
+                    t.set_postfix(valid_loss="{:05.3f}".format(loss.item()), 
+                            valid_acc="{:05.3f}".format(acc.item()))    
+                    t.update()
+
 
     def _save_checkpoint(self, epoch, max_accuracy):
         """
@@ -157,8 +174,32 @@ class Trainer(object):
         """
         
 
-    def _save_samplers(epoch, data, pred, sample_num=2):
+    def _save_samplers(self, epoch, batch_idx, data, label, pred):
 
-        images = 0
+        sample_num=1
+        
+        pred = pred.argmax(dim=1)
+
+
+
+        image = data[sample_num,:].clone().detach().cpu().numpy().transpose((1, 2, 0)) * 255
+        pred = pred[sample_num,:].clone()
+        label = label[sample_num,:].clone()
+
+        pred = label2image(pred, self.device).detach().cpu().numpy()
+        label = label2image(label, self.device).detach().cpu().numpy()
+
+        valid_dir = os.path.join(self.config.OUTPUT, self.config.VALID.dir)
+        if not os.path.isdir(valid_dir):
+            os.makedirs(valid_dir)
+
+        image_path = os.path.join(valid_dir, f"epoch_{epoch}_batch_idx_{batch_idx}.jpg")
+        pred_path = os.path.join(valid_dir, f"epoch_{epoch}_batch_idx_{batch_idx}_pred.png")
+        label_path = os.path.join(valid_dir, f"epoch_{epoch}_batch_idx_{batch_idx}_label.png")
+
+        cv2.imwrite(image_path, image)
+        cv2.imwrite(pred_path, pred)
+        cv2.imwrite(label_path, label)
+        
 
 
