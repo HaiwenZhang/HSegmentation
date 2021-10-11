@@ -15,7 +15,7 @@ from datasets import build_loader
 from loss import build_loss
 from metrics import pixel_acc
 from optimizer import build_optimizer
-from scheduler import build_scheduler, scheduler
+from scheduler import build_scheduler
 from logger import create_logger
 from utils import setup_seed
 from trainer import Trainer
@@ -46,7 +46,7 @@ def main(config):
 
     trainer = Trainer(logger, model, criterion, 
                         acc, optimizer, config, 
-                        device, train_data_loader, valid_data_loader)
+                        device, train_data_loader, valid_data_loader, lr_scheduler)
 
     logger.info("Start training")
     start_time = time.time()

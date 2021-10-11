@@ -96,8 +96,9 @@ class Trainer(object):
                 self.train_metrics.update("loss", loss.item())
                 self.train_metrics.update("acc", acc.item())
 
+
                 if self.lr_scheduler is not None:
-                    self.lr_scheduler.step_update(epoch * num_steps + idx)
+                    self.lr_scheduler.step()
 
 
                 t.set_description(f"Epoch Train [{epoch}/{self.total_epochs}]")

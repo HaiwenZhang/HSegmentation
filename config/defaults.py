@@ -32,6 +32,8 @@ _C.TRAIN.start_epoch = 0
 
 _C.TRAIN.optim = "SGD"
 _C.TRAIN.base_lr = 5e-4
+_C.TRAIN.momentum = 0.9
+_C.TRAIN.weight_decay = 1e-4
 _C.TRAIN.lr_min = 5e-6
 _C.TRAIN.warmup_lr = 5e-7
 _C.TRAIN.warmup_steps = 10
