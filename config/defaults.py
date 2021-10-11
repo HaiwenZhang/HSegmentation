@@ -31,15 +31,10 @@ _C.TRAIN.num_epochs = 20
 _C.TRAIN.start_epoch = 0
 
 _C.TRAIN.optim = "SGD"
-_C.TRAIN.lr_encoder = 0.02
-_C.TRAIN.lr_decoder = 0.02
-# power in poly to drop LR
-_C.TRAIN.lr_pow = 0.9
-# momentum for sgd, beta1 for adam
-_C.TRAIN.beta1 = 0.9
-# weights regularizer
-_C.TRAIN.weight_decay = 1e-4
-
+_C.TRAIN.base_lr = 5e-4
+_C.TRAIN.lr_min = 5e-6
+_C.TRAIN.warmup_lr = 5e-7
+_C.TRAIN.warmup_steps = 10
 _C.TRAIN.early_stop = 10
 _C.TRAIN.resume = False
 _C.TRAIN.mnt_mode = "max"

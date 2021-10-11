@@ -5,7 +5,7 @@ from torch.nn import parameter
 def build_optimizer(config, model):
    optimizer = torch.optim.SGD(
        model.parameters(),
-       lr=config.TRAIN.lr_encoder
+       lr=config.TRAIN.base_lr
    ) 
 
    return optimizer

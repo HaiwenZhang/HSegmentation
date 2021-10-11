@@ -77,9 +77,10 @@ class Trainer(object):
         self.model.train()
         self.train_metrics.reset()
 
+        num_steps = len(self.train_data_loader)
         # Use tqdm for progress bar
-        with tqdm(total=len(self.train_data_loader), colour=TRIAN_BAR_COLOR) as t:
-            for _, (data, target) in enumerate(self.train_data_loader):
+        with tqdm(total=num_steps, colour=TRIAN_BAR_COLOR) as t:
+            for idx, (data, target) in enumerate(self.train_data_loader):
                 data, target = data.to(self.device), target.to(self.device)
 
                 self.optimizer.zero_grad()
@@ -95,6 +96,10 @@ class Trainer(object):
                 self.train_metrics.update("loss", loss.item())
                 self.train_metrics.update("acc", acc.item())
 
+                if self.lr_scheduler is not None:
+                    self.lr_scheduler.step_update(epoch * num_steps + idx)
+
+
                 t.set_description(f"Epoch Train [{epoch}/{self.total_epochs}]")
                 t.set_postfix(train_loss="{:05.3f}".format(loss.item()), 
                             train_acc="{:05.3f}".format(acc.item()))    
@@ -103,8 +108,6 @@ class Trainer(object):
         if self.do_validation:
             self._valid_epoch(epoch)
 
-        if self.lr_scheduler is not None:
-            self.lr_scheduler.step()
 
         epoch_time = time.time() - start
 
@@ -195,7 +198,7 @@ class Trainer(object):
 
         image_path = os.path.join(valid_dir, f"epoch_{epoch}_batch_idx_{batch_idx}.jpg")
         pred_path = os.path.join(valid_dir, f"epoch_{epoch}_batch_idx_{batch_idx}_pred.png")
-        label_path = os.path.join(valid_dir, f"epoch_{epoch}_batch_idx_{batch_idx}_label.png")
+        label_path = os.path.join(valid_dir, f"epoch_{epoch}_batch_idx_{batch_idx}_gt.png")
 
         cv2.imwrite(image_path, image)
         cv2.imwrite(pred_path, pred)

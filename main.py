@@ -15,6 +15,7 @@ from datasets import build_loader
 from loss import build_loss
 from metrics import pixel_acc
 from optimizer import build_optimizer
+from scheduler import build_scheduler, scheduler
 from logger import create_logger
 from utils import setup_seed
 from trainer import Trainer
@@ -36,12 +37,11 @@ def main(config):
     train_data_loader, valid_data_loader = build_loader(config)
 
     model = build_model(config)
-
     model.to(device)
 
     optimizer = build_optimizer(config, model)
+    lr_scheduler = build_scheduler(config, optimizer)
     criterion = build_loss()
-
     acc = pixel_acc
 
     trainer = Trainer(logger, model, criterion, 
