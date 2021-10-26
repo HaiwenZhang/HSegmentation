@@ -1,10 +1,13 @@
-import os
-import cv2
 import time
-import datetime
-from apex.amp.handle import scale_loss
+import tqdm
 import torch
-from tqdm import tqdm
+import os.path as osp
+from collections import OrderedDict
+from utils.logger import print_log
+from utils.misc import get_gpu_memory_use, get_time_str, is_gpu_avaliable
+
+from ..utils import is_str, mkdir_or_exist
+from .tracker import AverageMeter
 
 try:
     # noinspection PyUnresolvedReferences
@@ -12,198 +15,179 @@ try:
 except ImportError:
     amp = None
 
-from .tracker import MetricTracker
-from datasets import label2image
-
-
 TRIAN_BAR_COLOR = "#00BFFF"
 VALID_BAR_COLOR = "#00FF00"
 
 class Trainer(object):
     """
     
+    - ``fit()``
+    - ``train_one_epoch()``
+    - ``val()``
+    - ``save_checkpoint()``
+    
     """
-    def __init__(self, logger, model, criterion, metric, optimizer, config, device,
-                 train_data_loader, valid_data_loader, lr_scheduler=None):
+
+
+    def __init__(self,
+                config,
+                model,
+                optimizer,
+                logger=None,
+                max_epochs=None):
+
         self.config = config
+        if amp is not None:
+            self.model, self.optimizer = amp.initialize(model, optimizer)
+        else:
+            self.model = model
+            self.optimizer = optimizer
+
         self.logger = logger
+        self.max_epochs = max_epochs
+        self.timestamp = get_time_str()
+        self._epoch = 0
 
-        self.model = model
-        self.optimizer = optimizer
-        self.criterion = criterion
-        self.metric = metric
 
-        self.model, self.optimizer = amp.initialize(model, optimizer, opt_level="O1")
-        
-        self.num_epochs = config.TRAIN.num_epochs
-        self.start_epoch = config.TRAIN.start_epoch
-        self.total_epochs = self.num_epochs - self.start_epoch
+    def fit(self,
+            train_loader,
+            valid_loader, lr_scheduler=None):
+        pass
 
-        self.device = device
-        self.train_data_loader = train_data_loader
- 
-        self.valid_data_loader = valid_data_loader
-        self.do_validation = self.valid_data_loader is not None
-        self.lr_scheduler = lr_scheduler
+        for epoch in range(self._epoch, self.max_epochs):
+            train_metrics = self.train_one_epoch(train_loader, epoch, lr_scheduler)
 
-        self.train_metrics = MetricTracker("loss", "acc")
-        self.valid_metrics = MetricTracker("loss", "acc")
+            if epoch % self.config.TRAIN.PRINT_FREQ == 0:
+                gpu_memory = get_gpu_memory_use()
+                lr = self.current_lr()
+                momentums = self.current_momentum()
 
-        self.early_stop = config.TRAIN.early_stop
+            metrics = self.val(valid_loader, epoch)
+            msg = f"Train: []"
+            print_log()
 
-        if config.TRAIN.resume:
-            self._resume_checkpoint(config)
 
-    def train(self):
-        """
-        Full training logic
-        """
-        for epoch in range(self.start_epoch, self.num_epochs + 1):
-            self._train_epoch(epoch)
-
-            # get valid acc
-            valid_acc = self.valid_metrics.avg('acc')
-
-            self._save_checkpoint(epoch, valid_acc)
-
-    def _train_epoch(self, epoch):
-        """
-        Training logic for an epoch
-
-        :param epoch: Current epoch number
-        """
-        start = time.time()
-
+    def train_one_epoch(self, 
+                        data_loader, 
+                        epoch,
+                        lr_scheduler=None):
         self.model.train()
-        self.train_metrics.reset()
+        self.model.mode = "train"
+        time.sleep(2)
 
-        num_steps = len(self.train_data_loader)
+        loss_meter = AverageMeter()
+        aAcc_meter = AverageMeter()
+
+        metrics = OrderedDict()
+
+        num_steps = len(data_loader)
         # Use tqdm for progress bar
         with tqdm(total=num_steps, colour=TRIAN_BAR_COLOR) as t:
-            for idx, (data, target) in enumerate(self.train_data_loader):
+            for idx, (data, target) in enumerate(data_loader):
                 data, target = data.to(self.device), target.to(self.device)
 
                 self.optimizer.zero_grad()
                 output = self.model(data)
-                loss = self.criterion(output, target)
+                loss = self.model.criterion(output, target)
 
                 with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                     scaled_loss.backward()
                 self.optimizer.step()
 
-                acc = self.metric(output, target)
+                acc = self.model.metric(output, target)
 
-                self.train_metrics.update("loss", loss.item())
-                self.train_metrics.update("acc", acc.item())
-
-
-                if self.lr_scheduler is not None:
-                    self.lr_scheduler.step()
-
+                loss_meter.update(loss.item())
+                aAcc_meter.update(acc.item())
 
                 t.set_description(f"Epoch Train [{epoch}/{self.total_epochs}]")
                 t.set_postfix(train_loss="{:05.3f}".format(loss.item()), 
                             train_acc="{:05.3f}".format(acc.item()))    
                 t.update()
 
-        if self.do_validation:
-            self._valid_epoch(epoch)
+        if self.lr_scheduler is not None:
+            self.lr_scheduler.step()
 
+        metrics["loss"] = loss_meter.avg
+        metrics["aAcc"] = aAcc_meter.avg
 
-        epoch_time = time.time() - start
+        return metrics
 
-        self.logger.info(
-                f"Train: [{epoch}/{self.total_epochs}]\t"
-                f"one epoch training takes time {datetime.timedelta(seconds=int(epoch_time))}\t"
-                f"train loss: {self.train_metrics.avg('loss'):.4f} val loss: {self.valid_metrics.avg('loss'):.4f}\t"
-                f"train acc: {self.train_metrics.avg('acc'):.4f} val acc: {self.valid_metrics.avg('acc'):.4f}\t")
-
-    def _valid_epoch(self, epoch):
-        """
-        Validate after training an epoch
-
-        :param epoch: Integer, current training epoch.
-        """
+    @torch.no_grad()
+    def val(self, 
+            data_loader,
+            epoch):
         self.model.eval()
-        self.valid_metrics.reset()
-        with torch.no_grad():
-             # Use tqdm for progress bar
-            with tqdm(total=len(self.valid_data_loader), colour=VALID_BAR_COLOR) as t:
-                for batch_idx, (data, target) in enumerate(self.train_data_loader):
-                    data, target = data.to(self.device), target.to(self.device)
+        self.model.mode = "train"
+        time.sleep(2)
 
-                    output = self.model(data)
-                    loss = self.criterion(output, target)
-                    acc = self.metric(output, target)
+
+        loss_meter = AverageMeter()
+        aAcc_meter = AverageMeter()
+        iou_meter = AverageMeter()
+
+        for idx, (images, target) in enumerate(data_loader):
+            if is_gpu_avaliable:
+                images = images.cuda(non_blocking=True)
+                target = target.cuda(non_blocking=True)
+
+            output = self.model(images)
+            loss = self.model.criterion(output, target)
                 
-                    self.valid_metrics.update("loss", loss.item())
-                    self.valid_metrics.update("acc", acc.item())
-
-                    self._save_samplers(epoch, batch_idx, data, target, output)
-
-                    t.set_description(f"Epoch Valid [{epoch}/{self.total_epochs}]")
-                    t.set_postfix(valid_loss="{:05.3f}".format(loss.item()), 
-                            valid_acc="{:05.3f}".format(acc.item()))    
-                    t.update()
 
 
-    def _save_checkpoint(self, epoch, max_accuracy):
+
+    def current_lr(self):
+        """Get current learning rates.
+
+        Returns:
+            list[float] | dict[str, list[float]]: Current learning rates of all
+                param groups. If the runner has a dict of optimizers, this
+                method will return a dict.
         """
-        Saving checkpoints
+        if isinstance(self.optimizer, torch.optim.Optimizer):
+            lr = [group['lr'] for group in self.optimizer.param_groups]
+        elif isinstance(self.optimizer, dict):
+            lr = dict()
+            for name, optim in self.optimizer.items():
+                lr[name] = [group['lr'] for group in optim.param_groups]
+        else:
+            raise RuntimeError(
+                'lr is not applicable because optimizer does not exist.')
+        return lr
 
-        :param epoch: current epoch number
-        :param log: logging information of the epoch
-        :param save_best: if True, rename the saved checkpoint to 'model_best.pth'
+    
+    def current_momentum(self):
+        """Get current momentums.
+
+        Returns:
+            list[float] | dict[str, list[float]]: Current momentums of all
+                param groups. If the runner has a dict of optimizers, this
+                method will return a dict.
         """
-        state = {
-            'model': self.model.state_dict(),
-            'optimizer': self.optimizer.state_dict(),
-            'max_accuracy': max_accuracy,
-            'epoch': epoch,
-            'config': self.config
-        }
 
-        save_path = os.path.join(self.config.OUTPUT, f'ckpt_epoch_{epoch}.pth')
-        torch.save(state, save_path)
-        self.logger.info("Saving checkpoint: {} ...".format(save_path))
-        # if save_best:
-        #     best_path = os.path.join(self.config.OUTPUT, f'model_best.pth')
-        #     torch.save(state, best_path)
-        #     self.logger.info("Saving current best: model_best.pth ...")
+        def _get_momentum(optimizer):
+            momentums = []
+            for group in optimizer.param_groups:
+                if 'momentum' in group.keys():
+                    momentums.append(group['momentum'])
+                elif 'betas' in group.keys():
+                    momentums.append(group['betas'][0])
+                else:
+                    momentums.append(0)
+            return momentums
 
-    def _resume_checkpoint(self):
-        """
-        Resume from saved checkpoints
+        if self.optimizer is None:
+            raise RuntimeError(
+                'momentum is not applicable because optimizer does not exist.')
+        elif isinstance(self.optimizer, torch.optim.Optimizer):
+            momentums = _get_momentum(self.optimizer)
+        elif isinstance(self.optimizer, dict):
+            momentums = dict()
+            for name, optim in self.optimizer.items():
+                momentums[name] = _get_momentum(optim)
+        return momentums
 
-        """
+    def _print_metrics(metrics):
         
 
-    def _save_samplers(self, epoch, batch_idx, data, label, pred):
-
-        sample_num=1
-        
-        pred = pred.argmax(dim=1)
-
-
-
-        image = data[sample_num,:].clone().detach().cpu().numpy().transpose((1, 2, 0)) * 255
-        pred = pred[sample_num,:].clone()
-        label = label[sample_num,:].clone()
-
-        pred = label2image(pred, self.device).detach().cpu().numpy()
-        label = label2image(label, self.device).detach().cpu().numpy()
-
-        valid_dir = os.path.join(self.config.OUTPUT, self.config.VALID.dir)
-        if not os.path.isdir(valid_dir):
-            os.makedirs(valid_dir)
-
-        image_path = os.path.join(valid_dir, f"epoch_{epoch}_batch_idx_{batch_idx}.jpg")
-        pred_path = os.path.join(valid_dir, f"epoch_{epoch}_batch_idx_{batch_idx}_pred.png")
-        label_path = os.path.join(valid_dir, f"epoch_{epoch}_batch_idx_{batch_idx}_gt.png")
-
-        cv2.imwrite(image_path, image)
-        cv2.imwrite(pred_path, pred)
-        cv2.imwrite(label_path, label)
-        
-
-
+        print_log()

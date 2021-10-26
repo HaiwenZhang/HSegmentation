@@ -1,7 +1,7 @@
 from yacs.config import CfgNode as CN
 
 _C = CN()
-_C.OUTPUT = "./output"
+_C.WORK_DIR = "./work_dir"
 
 _C.DATASET = CN()
 _C.DATASET.root_dataset = "./data/"
@@ -44,6 +44,7 @@ _C.TRAIN.mnt_mode = "max"
 _C.TRAIN.workers = 4
 # manual seed
 _C.TRAIN.seed = 304
+_C.TRAIN.PRINT_FREQ = 2
 
 # -----------------------------------------------------------------------------
 # VALID

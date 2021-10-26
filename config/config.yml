@@ -1,4 +1,4 @@
-OUTPUT: "./output"
+WORK_DIR: "./work_dir"
 DATASET:
   root_dataset: "/home/haiwen/Datasets/VOC2012"
   num_class: 21
@@ -25,6 +25,7 @@ TRAIN:
   mnt_mode: max
   workers: 4
   seed: 304
+  PRINT_FREQ: 2
 
 LOG:
   dir_name: "log"

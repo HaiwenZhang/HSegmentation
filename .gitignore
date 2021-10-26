@@ -110,5 +110,6 @@ __MACOSX/
 
 *.txt
 output/
+work_dir/
 config/local.yml
 .DS_Store

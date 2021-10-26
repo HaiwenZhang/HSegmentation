@@ -5,6 +5,14 @@ import argparse
 import datetime
 import logging
 
+from utils import (
+    is_str, 
+    mkdir_or_exist,
+    get_default_logger,
+    print_log,
+    setup_seed, 
+    setup_workspace)
+
 import numpy as np
 
 import torch
@@ -16,8 +24,6 @@ from loss import build_loss
 from metrics import pixel_acc
 from optimizer import build_optimizer
 from scheduler import build_scheduler
-from logger import create_logger
-from utils import setup_seed
 from trainer import Trainer
 
 def parse_option():
@@ -44,17 +50,19 @@ def main(config):
     criterion = build_loss()
     acc = pixel_acc
 
-    trainer = Trainer(logger, model, criterion, 
-                        acc, optimizer, config, 
-                        device, train_data_loader, valid_data_loader, lr_scheduler)
 
-    logger.info("Start training")
+    trainner = Trainer()
+
+    print_log("Start trainning")
     start_time = time.time()
-    trainer.train()
+
+    trainner.fit()
+
     total_time = time.time() - start_time
 
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
-    logging.info('Training time {}'.format(total_time_str))
+    print_log('Training time {}'.format(total_time_str))
+
 
 
 if __name__ == '__main__':
@@ -63,19 +71,31 @@ if __name__ == '__main__':
 
     cfg.merge_from_file(args.cfg)
 
-    if not os.path.isdir(cfg.OUTPUT):
-        os.makedirs(cfg.OUTPUT)
-    log_dir = os.path.join(cfg.OUTPUT, cfg.LOG.dir_name)
-    if not os.path.isdir(log_dir):
-        os.makedirs(log_dir)
 
-    logger = create_logger(log_dir)
+    if is_str(cfg.WORK_DIR):
+        work_dir = os.path.abspath(cfg.WORK_DIR)
+        mkdir_or_exist(work_dir)
+    else:
+        raise ValueError('"work_dir" must be set')
+
+    if is_str(cfg.LOG.dir_name):
+        log_dir = os.path.abspath(os.path.abspath(work_dir, cfg.LOG.dir_name))
+        mkdir_or_exist(log_dir)
+    else:
+        raise ValueError('"Log dir" must be set')
+
+    timestamp = time.strftime('%Y%m%d_%H%M%S', time.localtime())
+    log_file = os.path.join(log_dir, f'{timestamp}.log')
+    
+
+    logger = get_default_logger("HSeg", log_file=log_file)
 
     if args.is_save_cfg:
         path = os.path.join(cfg.OUTPUT, "config.yml")
         with open(path, 'w') as f:
             f.write("{}".format(cfg))
-        logger.info(f"Full config saved to {path}")
+
+        print_log(f"Full config save to {path}")
     
     setup_seed(cfg.TRAIN.seed)
     main(cfg)

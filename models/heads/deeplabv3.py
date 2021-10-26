@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
+from loss import build_loss
 from ..backbones import create_resnet50
 
 class ASPPConv(nn.Module):
@@ -95,8 +96,14 @@ class DeeplabV3(nn.Module):
     def __init__(self, backbone, num_class, encode_channels=2048):
         super(DeeplabV3, self).__init__()
 
+        self.loss = build_loss()
+        self.metric = {}
+        self.mode = "valid"
+
+
         self.backbone = backbone
         self.aspp = ASPP(encode_channels, num_class)
+
 
     def forward(self, x):
         size = x.shape[-2:]
@@ -105,6 +112,17 @@ class DeeplabV3(nn.Module):
         output = F.interpolate(output, size=size, mode='bilinear', align_corners=False)
         return output
 
+    def criterion(self, output, target):
+        return self.loss(output, target)
 
 
+    def metrics(self, output, target):
+        
+        if self.mode == "train":
+            pass
+
+        elif self.mode == "valid":
+            pass
+
+        return
 
