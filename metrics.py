@@ -417,3 +417,8 @@ def IOU(output, target, K, ignore_index=255):
     area_target = torch.histc(target, bins=K, min=0, max=K-1)
     area_union = area_output + area_target - area_intersection
     return area_union
+
+
+def build_metrics(config):
+    
+    pass

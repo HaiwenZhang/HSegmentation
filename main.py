@@ -21,7 +21,7 @@ from config import cfg
 from models import build_model
 from datasets import build_loader
 from loss import build_loss
-from metrics import pixel_acc
+from metrics import build_metrics
 from optimizer import build_optimizer
 from scheduler import build_scheduler
 from trainer import Trainer
@@ -36,7 +36,7 @@ def parse_option():
 
     return args
 
-def main(config):
+def main(config, logger):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -48,15 +48,15 @@ def main(config):
     optimizer = build_optimizer(config, model)
     lr_scheduler = build_scheduler(config, optimizer)
     criterion = build_loss()
-    acc = pixel_acc
+    metrics = build_metrics(config)
 
 
-    trainner = Trainer()
+    trainer = Trainer(config, model, criterion, metrics, logger)
 
-    print_log("Start trainning")
+    print_log("Start training")
     start_time = time.time()
 
-    trainner.fit()
+    trainer.fit(train_data_loader, valid_data_loader, lr_scheduler=lr_scheduler)
 
     total_time = time.time() - start_time
 
@@ -98,4 +98,4 @@ if __name__ == '__main__':
         print_log(f"Full config save to {path}")
     
     setup_seed(cfg.TRAIN.seed)
-    main(cfg)
+    main(cfg, logger)

@@ -15,7 +15,7 @@ try:
 except ImportError:
     amp = None
 
-TRIAN_BAR_COLOR = "#00BFFF"
+TRAIN_BAR_COLOR = "#00BFFF"
 VALID_BAR_COLOR = "#00FF00"
 
 class Trainer(object):
@@ -33,8 +33,9 @@ class Trainer(object):
                 config,
                 model,
                 optimizer,
-                logger=None,
-                max_epochs=None):
+                criterion,
+                metrics,
+                logger=None):
 
         self.config = config
         if amp is not None:
@@ -43,17 +44,20 @@ class Trainer(object):
             self.model = model
             self.optimizer = optimizer
 
+        
+        self.criterion = criterion
+        self.metrics = metrics
         self.logger = logger
-        self.max_epochs = max_epochs
+        self.max_epochs = config.TRAIN.MAX_EPOCHS
         self.timestamp = get_time_str()
         self._epoch = 0
 
 
     def fit(self,
             train_loader,
-            valid_loader, lr_scheduler=None):
-        pass
-
+            valid_loader, 
+            lr_scheduler=None):
+        
         for epoch in range(self._epoch, self.max_epochs):
             train_metrics = self.train_one_epoch(train_loader, epoch, lr_scheduler)
 
@@ -82,7 +86,7 @@ class Trainer(object):
 
         num_steps = len(data_loader)
         # Use tqdm for progress bar
-        with tqdm(total=num_steps, colour=TRIAN_BAR_COLOR) as t:
+        with tqdm(total=num_steps, colour=TRAIN_BAR_COLOR) as t:
             for idx, (data, target) in enumerate(data_loader):
                 data, target = data.to(self.device), target.to(self.device)
 
@@ -133,6 +137,7 @@ class Trainer(object):
             output = self.model(images)
             loss = self.model.criterion(output, target)
                 
+
 
 
 

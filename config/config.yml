@@ -26,6 +26,11 @@ TRAIN:
   workers: 4
   seed: 304
   PRINT_FREQ: 2
+  METRICS:
+    - "mIOU"
+    - "aAcc"
+    - "mDice"
+    - "mFscore"
 
 LOG:
   dir_name: "log"
