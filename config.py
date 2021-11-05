@@ -65,3 +65,11 @@ _C.LOG = CN()
 _C.LOG.dir_name = "log"
 _C.LOG.train_file = "train.log"
 _C.LOG.tensorboard_file = "tensorborad"
+
+
+
+def get_cfg_defaults():
+  """Get a yacs CfgNode object with default values for my_project."""
+  # Return a clone so that the defaults will not be altered
+  # This is for the "local variable" use pattern
+  return _C.clone()

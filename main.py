@@ -17,7 +17,6 @@ import numpy as np
 
 import torch
 
-from config import cfg
 from models import build_model
 from datasets import build_loader
 from loss import build_loss
@@ -26,15 +25,21 @@ from optimizer import build_optimizer
 from scheduler import build_scheduler
 from trainer import Trainer
 
+from .config import get_cfg_defaults
+
 def parse_option():
-    parser = argparse.ArgumentParser('DeeplabV3 training script', add_help=False)
+    parser = argparse.ArgumentParser('Segmentation Train', add_help=False)
     parser.add_argument('--cfg', type=str, help='config file path')
     parser.add_argument('--gpu', type=str, help='GPU to use')
-    parser.add_argument('--is_save_cfg', type=bool, default=True, help='If save train config file')
 
     args, unparsed = parser.parse_known_args()
 
-    return args
+    cfg = get_cfg_defaults()
+    cfg.merge_from_file(args.cfg)
+    cfg.merge_from_list(args.opts)
+    cfg.freeze()
+
+    return args, cfg
 
 def main(config, logger):
 
@@ -67,10 +72,7 @@ def main(config, logger):
 
 if __name__ == '__main__':
 
-    args = parse_option()
-
-    cfg.merge_from_file(args.cfg)
-
+    args, cfg= parse_option()
 
     if is_str(cfg.WORK_DIR):
         work_dir = os.path.abspath(cfg.WORK_DIR)
@@ -87,7 +89,6 @@ if __name__ == '__main__':
     timestamp = time.strftime('%Y%m%d_%H%M%S', time.localtime())
     log_file = os.path.join(log_dir, f'{timestamp}.log')
     
-
     logger = get_default_logger("HSeg", log_file=log_file)
 
     if args.is_save_cfg:
